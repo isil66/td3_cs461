@@ -286,7 +286,7 @@ class TD3:
 if __name__ == '__main__':
     total_game_count = 500
     x = [i + 1 for i in range(total_game_count)]
-    seeds = [0, 1, 2, 3, 4, 5]  # Use six different seeds
+    seeds = [42, 1337, 256, 9876, 2021, 999]
     filename = 'plots/LunarLanderContinuous_{}_games.png'.format(total_game_count)
     all_scores = []  # To store results across different seeds
 
