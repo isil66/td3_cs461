@@ -5,6 +5,8 @@ import torch.nn.functional as F
 import torch.optim as optim
 import os
 import copy
+import gym
+import matplotlib.pyplot as plt
 
 
 class ReplayBuffer:
@@ -159,6 +161,8 @@ class TD3:
         self.critic1.set_name("critic1")
         self.critic2.set_name("critic2")
 
+        self.score_hist = []
+        self.iteration_count = -1
         self.capital_t = capital_t
         self.batch_size = batch_size
         self.discount = discount
@@ -175,6 +179,9 @@ class TD3:
         # start the environment
         state = self.env.reset()
 
+        total_score = 0
+        best_score = self.env.reward_range[0]
+
         for t in range(self.capital_t):
 
             # select action w noise
@@ -189,6 +196,17 @@ class TD3:
 
             # observe reward and next state
             state, reward, next_state, terminal = self.env.step(action)
+
+            total_score += reward
+            self.score_hist.append(total_score)
+            avg_score = np.mean(self.score_hist[-100:])
+
+            if avg_score > best_score:
+                best_score = avg_score
+                agent.save_models()
+
+            print('episode ', t, 'score %.1f' % total_score,
+                  'average score %.1f' % avg_score)
 
             # store transition tuple
             self.buffer.store_transition(state, action, reward, next_state, terminal)
@@ -243,3 +261,46 @@ class TD3:
 
                 for param, target_param in zip(self.actor.parameters(), self.target_actor.parameters()):
                     target_param.data.copy_(self.tau * param.data + (1 - self.tau) * target_param.data)
+
+            if terminal:
+                self.iteration_count = t
+                break
+
+    def save_models(self):
+        self.actor.save_checkpoint()
+        self.target_actor.save_checkpoint()
+        self.critic1.save_checkpoint()
+        self.critic2.save_checkpoint()
+        self.target_critic1.save_checkpoint()
+        self.target_critic2.save_checkpoint()
+
+    def load_models(self):
+        self.actor.load_checkpoint()
+        self.target_actor.load_checkpoint()
+        self.critic1.load_checkpoint()
+        self.critic2.load_checkpoint()
+        self.target_critic1.load_checkpoint()
+        self.target_critic2.load_checkpoint()
+
+
+if __name__ == '__main__':
+    env = gym.make('LunarLanderContinuous-v2')
+    agent = TD3(alpha=0.001, beta=0.001,
+                input_dims=env.observation_space.shape, tau=0.005,
+                env=env, batch_size=100, discount=0.99, d=2, noise_std=0.1,
+                n_actions=env.action_space.shape[0], capital_t=10000, initial_pure_exploration_limit=1000)
+    total_game_count = 500
+    filename = 'plots/' + 'LunarLanderContinuous_' + str(total_game_count) + '_games.png'
+
+    agent.load_models()
+
+    for i in range(total_game_count):
+        agent.run()
+
+    x = [i + 1 for i in range(total_game_count)]
+    running_avg = np.zeros(len(agent.score_hist))
+    for i in range(len(running_avg)):
+        running_avg[i] = np.mean(agent.score_hist[max(0, i - 100):(i + 1)])
+    plt.plot(x, running_avg)
+    plt.title('Running average of previous 100 scores')
+    plt.savefig(filename)
