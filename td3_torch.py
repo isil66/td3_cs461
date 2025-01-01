@@ -284,23 +284,50 @@ class TD3:
 
 
 if __name__ == '__main__':
-    env = gym.make('LunarLanderContinuous-v2')
-    agent = TD3(alpha=0.001, beta=0.001,
-                input_dims=env.observation_space.shape, tau=0.005,
-                env=env, batch_size=100, discount=0.99, d=2, noise_std=0.1,
-                n_actions=env.action_space.shape[0], capital_t=10000, initial_pure_exploration_limit=1000)
     total_game_count = 500
-    filename = 'plots/' + 'LunarLanderContinuous_' + str(total_game_count) + '_games.png'
-
-    agent.load_models()
-
-    for i in range(total_game_count):
-        agent.run()
-
     x = [i + 1 for i in range(total_game_count)]
-    running_avg = np.zeros(len(agent.score_hist))
-    for i in range(len(running_avg)):
-        running_avg[i] = np.mean(agent.score_hist[max(0, i - 100):(i + 1)])
-    plt.plot(x, running_avg)
-    plt.title('Running average of previous 100 scores')
+    seeds = [0, 1, 2, 3, 4, 5]  # Use six different seeds
+    filename = 'plots/LunarLanderContinuous_{}_games.png'.format(total_game_count)
+    all_scores = []  # To store results across different seeds
+
+    for seed in seeds:
+        env = gym.make('LunarLanderContinuous-v2')
+        env.action_space.seed(seed)
+        np.random.seed(seed)
+        T.manual_seed(seed)
+        np.random.seed(seed)
+
+        agent = TD3(alpha=0.001, beta=0.001,
+                    input_dims=env.observation_space.shape, tau=0.005,
+                    env=env, batch_size=100, discount=0.99, d=2, noise_std=0.1,
+                    n_actions=env.action_space.shape[0], capital_t=10000, initial_pure_exploration_limit=1000)
+
+        agent.load_models()
+
+        scores = []
+        for i in range(total_game_count):
+            agent.run()
+            scores.append(agent.score_hist[-1])
+
+        # calculate the running average of scores
+
+        running_avg = np.zeros(len(scores))
+        for i in range(len(running_avg)):
+            running_avg[i] = np.mean(scores[max(0, i - 100):(i + 1)])
+
+        # Save the plot for the current seed
+        plt.plot(x, running_avg)
+        plt.title(f'Running average of previous 100 scores (Seed {seed})')
+        plt.savefig(f'plots/LunarLanderContinuous_{seed}_games.png')
+        plt.clf()  # Clear the figure for the next plot
+
+        all_scores.append(scores)  # Store all scores for averaging
+
+    # Compute the average performance across all seeds
+    all_scores = np.array(all_scores)
+    avg_scores = np.mean(all_scores, axis=0)
+
+    # Plot the average performance across all seeds
+    plt.plot(x, avg_scores)
+    plt.title('Average Running Average of Previous 100 Scores Across All Seeds')
     plt.savefig(filename)
