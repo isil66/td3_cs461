@@ -300,11 +300,11 @@ class TD3:
 
 
 if __name__ == '__main__':
-    total_game_count = 500
+    total_game_count = 1000
     x = [i + 1 for i in range(total_game_count)]
     seeds = [42, 1337, 256, 9876, 2021, 999]
     filename = 'plots/LunarLanderContinuous_{}_games.png'.format(total_game_count)
-    all_scores = []  # To store results across different seeds
+    all_scores = []
 
     for seed in seeds:
         env = gym.make('LunarLanderContinuous-v2')
@@ -326,7 +326,6 @@ if __name__ == '__main__':
             scores.append(agent.score_hist[-1])
 
         # calculate the running average of scores
-
         running_avg = np.zeros(len(scores))
         for i in range(len(running_avg)):
             running_avg[i] = np.mean(scores[max(0, i - 100):(i + 1)])
@@ -334,16 +333,14 @@ if __name__ == '__main__':
         # Save the plot for the current seed
         plt.plot(x, running_avg)
         plt.title(f'Running average of previous 100 scores (Seed {seed})')
-        plt.savefig(f'plots/LunarLanderContinuous_{seed}_games.png')
-        plt.clf()  # Clear the figure for the next plot
+        plt.savefig(f'plots/LunarLanderContinuous_with_seed{seed}.png')
+        plt.clf()
 
-        all_scores.append(scores)  # Store all scores for averaging
+        all_scores.append(scores)
 
-    # Compute the average performance across all seeds
+    # compute the average performance across all seeds
     all_scores = np.array(all_scores)
     avg_scores = np.mean(all_scores, axis=0)
-
-    # Plot the average performance across all seeds
     plt.plot(x, avg_scores)
     plt.title('Average Running Average of Previous 100 Scores Across All Seeds')
     plt.savefig(filename)
