@@ -186,6 +186,9 @@ class TD3:
         # start the environment
         state = self.env.reset()
 
+        if isinstance(state, tuple):
+            state = state[0]
+
         total_score = 0
         best_score = self.env.reward_range[0]
 
@@ -216,6 +219,9 @@ class TD3:
                   'average score %.1f' % avg_score)
 
             # store transition tuple
+            if isinstance(state, tuple):
+                state = state[0]
+
             self.buffer.store_transition(state, action, reward, next_state, terminal)
 
             # sample mini batch
