@@ -18,14 +18,15 @@ class ReplayBuffer:
         self.device = T.device("cuda" if T.cuda.is_available() else "cpu")
         self.current_size = 0
 
-        self.state_memory = np.zeros(self.mem_size, *input_dims)
-        self.next_state_memory = np.zeros(self.mem_size, *input_dims)
-        self.reward_memory = np.zeros(self.mem_size, n_actions)
-        self.action_memory = np.zeros(self.mem_size, n_actions)
+        self.state_memory = np.zeros((self.mem_size, *input_dims))
+        self.next_state_memory = np.zeros((self.mem_size, *input_dims))
+        self.reward_memory = np.zeros(self.mem_size)
+        self.action_memory = np.zeros((self.mem_size, n_actions))
         self.terminal_memory = np.zeros(self.mem_size, dtype=bool)  # done flags of environment
 
     def store_transition(self, state, action, reward, next_state, done):
         index = self.mem_counter % self.mem_size  # circular buffer
+
         self.state_memory[index] = state
         self.next_state_memory[index] = next_state
         self.terminal_memory[index] = done
@@ -94,8 +95,11 @@ class CriticNetwork(nn.Module):
         T.save(self.state_dict(), self.checkpoint_file)
 
     def load_checkpoint(self):
-        print('load checkpoint')
-        self.load_state_dict(T.load(self.checkpoint_file))
+        if os.path.isfile(self.checkpoint_file):
+            print(f"Loading checkpoint from {self.checkpoint_file}")
+            self.load_state_dict(T.load(self.checkpoint_file))
+        else:
+            print(f"Checkpoint file {self.checkpoint_file} not found. Initializing with random weights.")
 
 
 class ActorNetwork(nn.Module):
@@ -137,8 +141,11 @@ class ActorNetwork(nn.Module):
         T.save(self.state_dict(), self.checkpoint_file)
 
     def load_checkpoint(self):
-        print('load checkpoint')
-        self.load_state_dict(T.load(self.checkpoint_file))
+        if os.path.isfile(self.checkpoint_file):
+            print(f"Loading checkpoint from {self.checkpoint_file}")
+            self.load_state_dict(T.load(self.checkpoint_file))
+        else:
+            print(f"Checkpoint file {self.checkpoint_file} not found. Initializing with random weights.")
 
 
 class TD3:
@@ -195,7 +202,7 @@ class TD3:
                          T.FloatTensor(np.random.normal(scale=self.noise_std)).to(self.actor.device)
 
             # observe reward and next state
-            state, reward, next_state, terminal = self.env.step(action)
+            next_state, reward, terminal, truncated, info = self.env.step(action)
 
             total_score += reward
             self.score_hist.append(total_score)
@@ -262,6 +269,7 @@ class TD3:
                 for param, target_param in zip(self.actor.parameters(), self.target_actor.parameters()):
                     target_param.data.copy_(self.tau * param.data + (1 - self.tau) * target_param.data)
 
+            state = next_state
             if terminal:
                 self.iteration_count = t
                 break
