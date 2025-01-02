@@ -201,10 +201,13 @@ class TD3:
                 action = self.env.action_space.sample()
             else:
                 state = T.FloatTensor(state).to(self.actor.device)
+                if isinstance(state, tuple):
+                    state = state[0]
                 action = self.actor.forward(state).to(self.actor.device) + \
                          T.FloatTensor(np.random.normal(scale=self.noise_std)).to(self.actor.device)
+                action = T.clamp(action, self.min_action[0], self.max_action[0]).cpu().detach().numpy()
 
-            # observe reward and next state
+                # observe reward and next state
             next_state, reward, terminal, truncated, info = self.env.step(action)
 
             total_score += reward
