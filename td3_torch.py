@@ -207,9 +207,9 @@ class TD3:
                 action = T.clamp(action, self.min_action[0], self.max_action[0]).cpu().detach().numpy()
 
             # observe reward and next state
-            next_state, reward, terminal, truncated, info = self.env.step(action)
+            next_state_observed, reward_observed, terminal_observed, truncated_observed, info = self.env.step(action)
 
-            total_score += reward
+            total_score += reward_observed
             self.score_hist.append(total_score)
             avg_score = np.mean(self.score_hist[-100:])
 
@@ -224,11 +224,14 @@ class TD3:
             if isinstance(state, tuple):
                 state = state[0]
 
-            self.buffer.store_transition(state, action, reward, next_state, terminal)
+            self.buffer.store_transition(state, action, reward_observed, next_state_observed, terminal_observed)
 
             # sample mini batch
             # train after collecting sufficient data
             if t < self.batch_size:
+                if terminal_observed or truncated_observed:
+                    self.iteration_count = t
+                    break
                 continue
 
             states, actions, next_states, rewards, terminals = self.buffer.sample(self.batch_size)
@@ -247,7 +250,7 @@ class TD3:
             # q1 = q1.view(-1)
             # q2 = q2.view(-1)
 
-            target = reward + self.discount * (T.min(q1_target, q2_target)) * terminals
+            target = rewards + self.discount * (T.min(q1_target, q2_target)) * terminals
 
             # update critics
             q1 = self.critic1.forward(states, actions)
@@ -281,8 +284,8 @@ class TD3:
                 for param, target_param in zip(self.actor.parameters(), self.target_actor.parameters()):
                     target_param.data.copy_(self.tau * param.data + (1 - self.tau) * target_param.data)
 
-            state = next_state
-            if terminal or truncated:
+            state = next_state_observed
+            if terminal_observed or truncated_observed:
                 self.iteration_count = t
                 break
 
