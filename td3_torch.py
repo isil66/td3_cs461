@@ -149,13 +149,13 @@ class ActorNetwork(nn.Module):
 
 
 class TD3:
-    def __init__(self, alpha, beta, input_dims, n_actions, capital_t, batch_size, discount, env, d, tau, noise_std,
+    def __init__(self, alpha, beta, input_dims, n_actions, capital_t, batch_size, discount, run_env, d, tau, noise_std,
                  initial_pure_exploration_limit):
         self.buffer = ReplayBuffer(int(1e6), input_dims, n_actions)
 
-        self.actor = ActorNetwork(alpha, input_dims, 256, 256, n_actions)
-        self.critic1 = CriticNetwork(beta, input_dims, 256, 256, n_actions)
-        self.critic2 = CriticNetwork(beta, input_dims, 256, 256, n_actions)
+        self.actor = ActorNetwork(alpha, input_dims, 400, 300, n_actions)
+        self.critic1 = CriticNetwork(beta, input_dims, 400, 300, n_actions)
+        self.critic2 = CriticNetwork(beta, input_dims, 400, 300, n_actions)
 
         self.target_actor = copy.deepcopy(self.actor)
         self.target_actor.set_name("target_actor")
@@ -173,13 +173,13 @@ class TD3:
         self.capital_t = capital_t
         self.batch_size = batch_size
         self.discount = discount
-        self.env = env
+        self.env = run_env
         self.d = d
         self.tau = tau
         self.noise_std = noise_std
         self.initial_pure_exploration_limit = initial_pure_exploration_limit
-        self.max_action = env.action_space.high
-        self.min_action = env.action_space.low
+        self.max_action = run_env.action_space.high
+        self.min_action = run_env.action_space.low
 
     def run(self):
 
@@ -206,7 +206,7 @@ class TD3:
                 action = action + T.FloatTensor([np.random.normal(scale=self.noise_std)]).to(self.actor.device)
                 action = T.clamp(action, self.min_action[0], self.max_action[0]).cpu().detach().numpy()
 
-                # observe reward and next state
+            # observe reward and next state
             next_state, reward, terminal, truncated, info = self.env.step(action)
 
             total_score += reward
@@ -227,6 +227,10 @@ class TD3:
             self.buffer.store_transition(state, action, reward, next_state, terminal)
 
             # sample mini batch
+            # train after collecting sufficient data
+            if t < self.batch_size:
+                continue
+
             states, actions, next_states, rewards, terminals = self.buffer.sample(self.batch_size)
 
             # noisy action from target actor
@@ -278,7 +282,7 @@ class TD3:
                     target_param.data.copy_(self.tau * param.data + (1 - self.tau) * target_param.data)
 
             state = next_state
-            if terminal:
+            if terminal or truncated:
                 self.iteration_count = t
                 break
 
@@ -315,7 +319,7 @@ if __name__ == '__main__':
 
         agent = TD3(alpha=0.001, beta=0.001,
                     input_dims=env.observation_space.shape, tau=0.005,
-                    env=env, batch_size=100, discount=0.99, d=2, noise_std=0.1,
+                    run_env=env, batch_size=100, discount=0.99, d=2, noise_std=0.1,
                     n_actions=env.action_space.shape[0], capital_t=10000, initial_pure_exploration_limit=1000)
 
         agent.load_models()
@@ -330,7 +334,7 @@ if __name__ == '__main__':
         for i in range(len(running_avg)):
             running_avg[i] = np.mean(scores[max(0, i - 100):(i + 1)])
 
-        # Save the plot for the current seed
+        # save the plot for the current seed
         plt.plot(x, running_avg)
         plt.title(f'Running average of previous 100 scores (Seed {seed})')
         plt.savefig(f'plots/LunarLanderContinuous_with_seed{seed}.png')
