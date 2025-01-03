@@ -181,7 +181,7 @@ class TD3:
         self.max_action = run_env.action_space.high
         self.min_action = run_env.action_space.low
 
-    def run(self):
+    def run(self, best_score_given):
 
         # start the environment
         state = self.env.reset()
@@ -190,7 +190,7 @@ class TD3:
             state = state[0]
 
         total_score = 0
-        best_score = self.env.reward_range[0]
+        avg_score = 0
 
         for t in range(self.capital_t):
 
@@ -213,9 +213,7 @@ class TD3:
             self.score_hist.append(total_score)
             avg_score = np.mean(self.score_hist[-100:])
 
-            if avg_score > best_score:
-                best_score = avg_score
-                agent.save_models()
+
 
             print('episode ', t, 'score %.1f' % total_score,
                   'average score %.1f' % avg_score)
@@ -287,7 +285,13 @@ class TD3:
             state = next_state_observed
             if terminal_observed or truncated_observed:
                 self.iteration_count = t
-                break
+                if avg_score > best_score_given:
+                    agent.save_models()
+                return avg_score
+        else:
+            if avg_score > best_score_given:
+                agent.save_models()
+            return avg_score
 
     def save_models(self):
         self.actor.save_checkpoint()
@@ -326,10 +330,12 @@ if __name__ == '__main__':
                     n_actions=env.action_space.shape[0], capital_t=10000, initial_pure_exploration_limit=1000)
 
         agent.load_models()
-
+        best_score = env.reward_range[0]
         scores = []
         for i in range(total_game_count):
-            agent.run()
+            avg_score = agent.run(best_score)
+            if avg_score > best_score:
+                best_score = avg_score
             scores.append(agent.score_hist[-1])
 
         # calculate the running average of scores
