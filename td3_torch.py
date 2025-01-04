@@ -227,9 +227,7 @@ class TD3:
             # sample mini batch
             # train after collecting sufficient data
             if t < self.batch_size:
-                if terminal_observed or truncated_observed:
-                    self.iteration_count = t
-                    break
+                state = next_state_observed
                 continue
 
             states, actions, next_states, rewards, terminals = self.buffer.sample(self.batch_size)
@@ -248,7 +246,7 @@ class TD3:
             # q1 = q1.view(-1)
             # q2 = q2.view(-1)
 
-            target = rewards + self.discount * (T.min(q1_target, q2_target)) * terminals
+            target = rewards + self.discount * (T.min(q1_target, q2_target)) * (1-terminals.float())
 
             # update critics
             q1 = self.critic1.forward(states, actions)
@@ -284,13 +282,16 @@ class TD3:
 
             state = next_state_observed
             if terminal_observed or truncated_observed:
-                self.iteration_count = t
-                if avg_score > best_score_given:
-                    agent.save_models()
-                return avg_score
+                state = self.env.reset()
+
+                if isinstance(state, tuple):
+                    state = state[0]
+
+                total_score = 0
+                avg_score = 0
         else:
             if avg_score > best_score_given:
-                agent.save_models()
+                self.save_models()
             return avg_score
 
     def save_models(self):
@@ -311,7 +312,7 @@ class TD3:
 
 
 if __name__ == '__main__':
-    total_game_count = 1000
+    total_game_count = 500
     x = [i + 1 for i in range(total_game_count)]
     seeds = [42, 1337, 256, 9876, 2021, 999]
     filename = 'plots/LunarLanderContinuous_{}_games.png'.format(total_game_count)
@@ -327,13 +328,14 @@ if __name__ == '__main__':
         agent = TD3(alpha=0.001, beta=0.001,
                     input_dims=env.observation_space.shape, tau=0.005,
                     run_env=env, batch_size=100, discount=0.99, d=2, noise_std=0.1,
-                    n_actions=env.action_space.shape[0], capital_t=10000, initial_pure_exploration_limit=1000)
+                    n_actions=env.action_space.shape[0], capital_t=5000, initial_pure_exploration_limit=1000)
 
         agent.load_models()
         best_score = env.reward_range[0]
         scores = []
         for i in range(total_game_count):
             avg_score = agent.run(best_score)
+
             if avg_score > best_score:
                 best_score = avg_score
             scores.append(agent.score_hist[-1])
