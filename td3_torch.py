@@ -239,6 +239,7 @@ class TD3:
             # train after collecting sufficient data
             if t < self.batch_size:
                 state = next_state_observed
+
                 # terminate episode if terminal state is next
                 if terminal_observed or truncated_observed:
                     self.iteration_count += 1
@@ -260,6 +261,7 @@ class TD3:
 
             target = rewards + self.discount * (T.min(T.flatten(q1_target), T.flatten(q2_target))) * (
                         1 - terminals.float())
+
 
             # update critics
             q1 = self.critic1.forward(states, actions)
@@ -298,6 +300,7 @@ class TD3:
             self.iteration_count += 1
             if terminal_observed or truncated_observed:
 
+
                 if avg_score_ > best_score_given:
                     agent.save_models()
                 return avg_score_
@@ -305,6 +308,7 @@ class TD3:
             if avg_score_ > best_score_given:
                 agent.save_models()
             return avg_score_
+
 
     def save_models(self):
         self.actor.save_checkpoint()
@@ -324,7 +328,7 @@ class TD3:
 
 
 if __name__ == '__main__':
-    total_game_count = 1000
+    total_game_count = 500
     x = [i + 1 for i in range(total_game_count)]
     seeds = [42, 1337, 256, 9876, 2021, 999]
     filename = 'plots/TD3_LunarLander_Continuous_{}_games.png'.format(total_game_count)
@@ -340,7 +344,9 @@ if __name__ == '__main__':
         agent = TD3(alpha=0.001, beta=0.001,
                     state_dimensions=env.observation_space.shape, tau=0.005,
                     run_env=env, batch_size=100, discount=0.99, d=2, noise_std=0.1,
+
                     action_dimensions=env.action_space.shape[0], capital_t=10000, initial_pure_exploration_limit=300)
+
 
         agent.load_models()
         best_score = env.reward_range[0]
@@ -349,6 +355,7 @@ if __name__ == '__main__':
         # run the episodes
         for i in range(total_game_count):
             avg_score = agent.run(best_score)
+
             if avg_score > best_score:
                 best_score = avg_score
             scores.append(agent.score_hist[-1])
